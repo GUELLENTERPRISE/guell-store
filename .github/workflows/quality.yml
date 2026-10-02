@@ -1,0 +1,46 @@
+name: Quality
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - chore/foundation-documentation
+      - ci/tableflow-mvp-foundation
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci --ignore-scripts
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Check tracked secrets and accidental markers
+        shell: bash
+        run: |
+          if git grep -n -I -E 'LOCAL_COMMIT_|SUPABASE_SERVICE_ROLE_KEY=[^[:space:]]+|sk_live_[A-Za-z0-9]+|-----BEGIN (RSA|OPENSSH|EC|PRIVATE) KEY-----' -- ':!package-lock.json'; then
+            echo 'Potential secret or accidental marker detected.'
+            exit 1
+          fi
